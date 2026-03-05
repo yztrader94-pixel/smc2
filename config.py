@@ -23,12 +23,6 @@ HIGHER_TF = "4h"                 # Higher timeframe for trend
 LOWER_TF = "15m"                 # Lower timeframe for entry
 
 # =============================================
-# BINANCE PUBLIC API (No key needed)
-# =============================================
-BINANCE_BASE_URL = "https://fapi.binance.com"  # Futures API
-BINANCE_SPOT_URL = "https://api.binance.com"   # Spot API
-
-# =============================================
 # STRATEGY PARAMETERS
 # =============================================
 RSI_PERIOD = 14
