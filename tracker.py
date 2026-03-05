@@ -59,10 +59,19 @@ class SignalTracker:
         self._bot = bot
 
     def add_signal(self, signal: dict, chat_id: int) -> TrackedSignal:
-        """Register a new signal for live tracking"""
+        """Register a new signal — skips if same pair+direction already active for this chat"""
+        pair      = signal["pair"]
+        direction = signal["signal"]
+
+        # Deduplicate: one active signal per pair per direction per chat
+        for existing in self._signals.values():
+            if existing.pair == pair and existing.signal == direction and existing.chat_id == chat_id:
+                logger.info(f"⚠️  Duplicate skipped: {pair} {direction} already tracked for chat {chat_id}")
+                return existing
+
         ts = TrackedSignal(
-            pair=signal["pair"],
-            signal=signal["signal"],
+            pair=pair,
+            signal=direction,
             entry=signal["entry"],
             stop_loss=signal["stop_loss"],
             tp1=signal["tp1"],
@@ -111,11 +120,10 @@ class SignalTracker:
                 if sig.signal == "LONG":
                     sig.highest_price = max(sig.highest_price, price)
 
-                    # Entry hit
+                    # Entry hit — mark active, no alert needed
                     if not sig.entry_hit and price >= sig.entry * 0.9995:
                         sig.entry_hit = True
                         sig.status = "ACTIVE"
-                        alerts.append(("entry", price))
 
                     if sig.entry_hit:
                         # SL hit — only if TP1 has NOT been hit yet
@@ -139,11 +147,10 @@ class SignalTracker:
                 else:
                     sig.lowest_price = min(sig.lowest_price, price)
 
-                    # Entry hit
+                    # Entry hit — mark active, no alert needed
                     if not sig.entry_hit and price <= sig.entry * 1.0005:
                         sig.entry_hit = True
                         sig.status = "ACTIVE"
-                        alerts.append(("entry", price))
 
                     if sig.entry_hit:
                         # SL hit — only if TP1 has NOT been hit yet
@@ -187,26 +194,19 @@ class SignalTracker:
 
         pnl_str = f"`{pnl_pct:+.2f}%`" if pnl_pct is not None else ""
 
-        if alert_type == "entry":
-            msg = (
-                f"🚀 *POSITION OPENED*\n\n"
-                f"{direction_emoji} *{sig.pair}* — {sig.signal}\n"
-                f"💰 Entry filled at `{price}`\n\n"
-                f"🛑 SL: `{sig.stop_loss}`\n"
-                f"🎯 TP1: `{sig.tp1}`\n"
-                f"🏆 TP2: `{sig.tp2}`\n\n"
-                f"📐 RR: `1:{sig.rr_ratio}`  |  🎲 `{sig.probability}%`\n"
-                f"⏰ `{_now()}`"
-            )
+        # Pre-calculate level percentages
+        sl_pct  = _level_pct(sig.entry, sig.stop_loss, sig.signal)
+        tp1_pct = _level_pct(sig.entry, sig.tp1, sig.signal)
+        tp2_pct = _level_pct(sig.entry, sig.tp2, sig.signal)
 
-        elif alert_type == "tp1":
+        if alert_type == "tp1":
             msg = (
                 f"🎯 *TP1 HIT!*\n\n"
                 f"{direction_emoji} *{sig.pair}* — {sig.signal}\n"
-                f"✅ Price reached `{price}` — TP1 `{sig.tp1}` touched!\n"
+                f"✅ Price reached `{price}` — TP1 `{sig.tp1}` ({tp1_pct}) touched!\n"
                 f"💵 P&L so far: {pnl_str}\n\n"
                 f"⚡ Consider moving SL to breakeven\n"
-                f"🏆 Riding to TP2: `{sig.tp2}`\n"
+                f"🏆 Riding to TP2: `{sig.tp2}` ({tp2_pct})\n"
                 f"⏰ `{_now()}`"
             )
 
@@ -214,7 +214,7 @@ class SignalTracker:
             msg = (
                 f"🏆 *TP2 HIT — FULL TARGET REACHED!* 🎉\n\n"
                 f"{direction_emoji} *{sig.pair}* — {sig.signal}\n"
-                f"✅ Price reached `{price}` — TP2 `{sig.tp2}` hit!\n"
+                f"✅ Price reached `{price}` — TP2 `{sig.tp2}` ({tp2_pct}) hit!\n"
                 f"💵 Total P&L: {pnl_str}\n"
                 f"📐 RR achieved: `1:{sig.rr_ratio}`\n\n"
                 f"🔒 Signal closed — great trade!\n"
@@ -225,7 +225,7 @@ class SignalTracker:
             msg = (
                 f"🛑 *STOP LOSS HIT*\n\n"
                 f"{direction_emoji} *{sig.pair}* — {sig.signal}\n"
-                f"❌ Price hit `{price}` — SL `{sig.stop_loss}` triggered\n"
+                f"❌ Price hit `{price}` — SL `{sig.stop_loss}` ({sl_pct}) triggered\n"
                 f"💵 P&L: {pnl_str}\n\n"
                 f"🔒 Signal closed — protect capital & move on\n"
                 f"⏰ `{_now()}`"
@@ -255,6 +255,18 @@ class SignalTracker:
 
     def stop(self):
         self._running = False
+
+
+def _level_pct(entry: float, target: float, direction: str) -> str:
+    """Return formatted % distance from entry to a price level"""
+    if entry == 0:
+        return "0.00%"
+    if direction == "LONG":
+        pct = ((target - entry) / entry) * 100
+    else:
+        pct = ((entry - target) / entry) * 100
+    sign = "+" if pct >= 0 else ""
+    return f"{sign}{pct:.2f}%"
 
 
 def _now() -> str:
