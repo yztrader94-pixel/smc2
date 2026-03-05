@@ -61,10 +61,19 @@ class MarketScanner:
         tasks = [analyze_with_semaphore(sym) for sym in symbols]
         await asyncio.gather(*tasks, return_exceptions=True)
 
+        # Deduplicate: keep only highest-probability signal per pair
+        seen_pairs = {}
+        for sig in signals:
+            pair = sig["pair"]
+            if pair not in seen_pairs or sig["probability"] > seen_pairs[pair]["probability"]:
+                seen_pairs[pair] = sig
+
+        signals = list(seen_pairs.values())
+
         # Sort by probability descending
         signals.sort(key=lambda x: x["probability"], reverse=True)
 
-        logger.info(f"Scan complete: {len(signals)} signals found")
+        logger.info(f"Scan complete: {len(signals)} unique signals found")
         return signals
 
     async def __aenter__(self):
