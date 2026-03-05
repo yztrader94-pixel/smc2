@@ -12,7 +12,7 @@ TELEGRAM_BOT_TOKEN = "7732870721:AAEHG3QJdo31S9sA8xjJzf-cXj6Tn4mo2uo"
 # SCAN SETTINGS
 # =============================================
 SCAN_INTERVAL_MINUTES = 30       # How often to auto-scan (minutes)
-TOP_PAIRS_LIMIT = 50             # Number of top USDT pairs to scan
+TOP_PAIRS_LIMIT = 999             # Scan ALL USDT pairs (Binance has ~300+)
 MIN_PROBABILITY_SCORE = 60       # Minimum signal probability to send (%)
 MIN_RR_RATIO = 2.0               # Minimum risk-reward ratio
 
@@ -30,4 +30,4 @@ RSI_OVERSOLD = 35
 RSI_OVERBOUGHT = 65
 VOLUME_SPIKE_MULTIPLIER = 1.5    # Volume must be X times average
 CANDLES_TO_FETCH = 100           # Number of candles to analyze
-MIN_VOLUME_USD = 10_000_000      # Min 24h volume in USD to include pair
+MIN_VOLUME_USD = 0               # No volume filter — scan every USDT pair
