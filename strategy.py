@@ -497,77 +497,71 @@ def generate_signal(
     rejection = detect_rejection_candle(ltf)
 
     # ─── Signal Logic ───────────────────────────
+    # STRICT GATE SYSTEM:
+    # Gate 1 (MANDATORY): HTF bias must align — no neutral allowed
+    # Gate 2 (MANDATORY): LTF structure must confirm direction (BOS or CHOCH only)
+    # Gate 3 (MANDATORY): Must have institutional zone — OB OR FVG retest
+    # Gate 4 (MANDATORY): Liquidity sweep must be present (stop hunt)
+    # Gate 5 (CONFIRMATION): At least 2 of 3 — RSI extreme + volume spike + rejection candle
+    # All 5 gates must pass — missing any single mandatory gate = no signal
+
     signal_dir = None
     probability = 0
     confirmations = []
 
-    # --- LONG SETUP ---
-    long_conditions = 0
-    if htf_bias == "bullish":
-        long_conditions += 1
-
-    ltf_trend_bullish = structure["trend"] in ("bullish", "bullish_reversal")
-    if ltf_trend_bullish:
-        long_conditions += 1
-
-    if liq_sweep.get("sweep_type") == "bullish":
-        long_conditions += 1
-
-    ob_bullish = ob.get("ob_type") == "bullish" and ob.get("price_in_ob")
+    ob_bullish  = ob.get("ob_type")  == "bullish" and ob.get("price_in_ob")
+    ob_bearish  = ob.get("ob_type")  == "bearish" and ob.get("price_in_ob")
     fvg_bullish = fvg.get("fvg_type") == "bullish" and fvg.get("price_in_fvg")
-    if ob_bullish or fvg_bullish:
-        long_conditions += 1
-
-    rsi_long_ok = current_rsi < RSI_OVERBOUGHT
-    if current_rsi < RSI_OVERSOLD:
-        long_conditions += 1
-        rsi_long_ok = True
-
-    if vol.get("spike"):
-        long_conditions += 1
-
-    rejection_bullish = rejection.get("pattern") in ("bullish_engulfing", "hammer")
-    if rejection_bullish:
-        long_conditions += 1
-
-    # --- SHORT SETUP ---
-    short_conditions = 0
-    if htf_bias == "bearish":
-        short_conditions += 1
-
-    ltf_trend_bearish = structure["trend"] in ("bearish", "bearish_reversal")
-    if ltf_trend_bearish:
-        short_conditions += 1
-
-    if liq_sweep.get("sweep_type") == "bearish":
-        short_conditions += 1
-
-    ob_bearish = ob.get("ob_type") == "bearish" and ob.get("price_in_ob")
     fvg_bearish = fvg.get("fvg_type") == "bearish" and fvg.get("price_in_fvg")
-    if ob_bearish or fvg_bearish:
-        short_conditions += 1
 
-    rsi_short_ok = current_rsi > RSI_OVERSOLD
-    if current_rsi > RSI_OVERBOUGHT:
-        short_conditions += 1
-        rsi_short_ok = True
+    # ── LONG GATES ──────────────────────────────────────────────────────
+    long_g1 = htf_bias == "bullish"                                          # Gate 1: HTF bullish
+    long_g2 = structure["trend"] in ("bullish", "bullish_reversal") and               (structure["bos"] or structure["choch"])                        # Gate 2: BOS or CHOCH confirmed
+    long_g3 = ob_bullish or fvg_bullish                                      # Gate 3: OB or FVG retest
+    long_g4 = liq_sweep.get("sweep_type") == "bullish"                      # Gate 4: liquidity sweep below
 
-    if vol.get("spike"):
-        short_conditions += 1
+    # Gate 5: confirmation score (need at least 2 of 3)
+    long_conf_score = sum([
+        current_rsi < RSI_OVERSOLD,                                          # RSI oversold
+        vol.get("spike", False),                                             # Volume spike
+        rejection.get("pattern") in ("bullish_engulfing", "hammer"),        # Rejection candle
+    ])
+    long_g5 = long_conf_score >= 2
 
-    rejection_bearish = rejection.get("pattern") in ("bearish_engulfing", "shooting_star")
-    if rejection_bearish:
-        short_conditions += 1
+    # ── SHORT GATES ─────────────────────────────────────────────────────
+    short_g1 = htf_bias == "bearish"                                         # Gate 1: HTF bearish
+    short_g2 = structure["trend"] in ("bearish", "bearish_reversal") and                (structure["bos"] or structure["choch"])                       # Gate 2: BOS or CHOCH confirmed
+    short_g3 = ob_bearish or fvg_bearish                                     # Gate 3: OB or FVG retest
+    short_g4 = liq_sweep.get("sweep_type") == "bearish"                     # Gate 4: liquidity sweep above
 
-    # Choose direction — need at least 4 conditions
-    if long_conditions >= 4 and long_conditions > short_conditions:
+    short_conf_score = sum([
+        current_rsi > RSI_OVERBOUGHT,                                        # RSI overbought
+        vol.get("spike", False),                                             # Volume spike
+        rejection.get("pattern") in ("bearish_engulfing", "shooting_star"), # Rejection candle
+    ])
+    short_g5 = short_conf_score >= 2
+
+    # ── FINAL DECISION ───────────────────────────────────────────────────
+    long_pass  = all([long_g1,  long_g2,  long_g3,  long_g4,  long_g5])
+    short_pass = all([short_g1, short_g2, short_g3, short_g4, short_g5])
+
+    # Reject if both somehow pass (conflicting — skip ambiguous setups)
+    if long_pass and short_pass:
+        return None
+
+    if long_pass:
         signal_dir = "LONG"
-        probability = min(50 + long_conditions * 7, 95)
-    elif short_conditions >= 4 and short_conditions > long_conditions:
+        # Probability: base 65 + bonus for extra confirmation
+        probability = 65 + (long_conf_score * 5) + (5 if structure["bos"] else 0)
+        probability = min(probability, 95)
+
+    elif short_pass:
         signal_dir = "SHORT"
-        probability = min(50 + short_conditions * 7, 95)
+        probability = 65 + (short_conf_score * 5) + (5 if structure["bos"] else 0)
+        probability = min(probability, 95)
+
     else:
-        return None  # Not enough confluence
+        return None  # Did not pass all mandatory gates
 
     # ─── Build Confirmations List ───────────────
     confirmations.append(f"HTF 4H bias: {htf_bias.upper()}")
