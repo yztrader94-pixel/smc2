@@ -31,7 +31,7 @@ TELEGRAM_CHAT_IDS = [-1002442074724
 # =============================================
 # SCAN SETTINGS
 # =============================================
-SCAN_INTERVAL_MINUTES = 30       # How often to auto-scan (minutes)
+SCAN_INTERVAL_MINUTES = 15       # How often to auto-scan (minutes)
 TOP_PAIRS_LIMIT = 999            # Scan ALL USDT pairs (Binance has ~300+)
 MIN_PROBABILITY_SCORE = 70       # Minimum signal probability to send (%)
 MIN_RR_RATIO = 2.0               # Minimum risk-reward ratio
