@@ -199,36 +199,40 @@ class SignalTracker:
         tp1_pct = _level_pct(sig.entry, sig.tp1, sig.signal)
         tp2_pct = _level_pct(sig.entry, sig.tp2, sig.signal)
 
+        d = "🟢" if sig.signal == "LONG" else "🔴"
+
         if alert_type == "tp1":
             msg = (
-                f"🎯 *TP1 HIT!*\n\n"
-                f"{direction_emoji} *{sig.pair}* — {sig.signal}\n"
-                f"✅ Price reached `{price}` — TP1 `{sig.tp1}` ({tp1_pct}) touched!\n"
-                f"💵 P&L so far: {pnl_str}\n\n"
-                f"⚡ Consider moving SL to breakeven\n"
-                f"🏆 Riding to TP2: `{sig.tp2}` ({tp2_pct})\n"
-                f"⏰ `{_now()}`"
+                f"🎯 *TP 1 Hit*  —  {d} *{sig.pair}*\n"
+                f"─────────────────\n"
+                f"*Price*   `{price}`\n"
+                f"*TP 1*    `{sig.tp1}`  {tp1_pct}\n"
+                f"*P&L*     {pnl_str}\n"
+                f"─────────────────\n"
+                f"Riding to TP 2  `{sig.tp2}`  {tp2_pct}"
             )
 
         elif alert_type == "tp2":
             msg = (
-                f"🏆 *TP2 HIT — FULL TARGET REACHED!* 🎉\n\n"
-                f"{direction_emoji} *{sig.pair}* — {sig.signal}\n"
-                f"✅ Price reached `{price}` — TP2 `{sig.tp2}` ({tp2_pct}) hit!\n"
-                f"💵 Total P&L: {pnl_str}\n"
-                f"📐 RR achieved: `1:{sig.rr_ratio}`\n\n"
-                f"🔒 Signal closed — great trade!\n"
-                f"⏰ `{_now()}`"
+                f"✅ *TP 2 Hit*  —  {d} *{sig.pair}*\n"
+                f"─────────────────\n"
+                f"*Price*   `{price}`\n"
+                f"*TP 2*    `{sig.tp2}`  {tp2_pct}\n"
+                f"*P&L*     {pnl_str}\n"
+                f"*RR*      `1:{sig.rr_ratio}`\n"
+                f"─────────────────\n"
+                f"Full target reached 🏆"
             )
 
         elif alert_type == "sl":
             msg = (
-                f"🛑 *STOP LOSS HIT*\n\n"
-                f"{direction_emoji} *{sig.pair}* — {sig.signal}\n"
-                f"❌ Price hit `{price}` — SL `{sig.stop_loss}` ({sl_pct}) triggered\n"
-                f"💵 P&L: {pnl_str}\n\n"
-                f"🔒 Signal closed — protect capital & move on\n"
-                f"⏰ `{_now()}`"
+                f"🛑 *SL Hit*  —  {d} *{sig.pair}*\n"
+                f"─────────────────\n"
+                f"*Price*   `{price}`\n"
+                f"*SL*      `{sig.stop_loss}`  {sl_pct}\n"
+                f"*P&L*     {pnl_str}\n"
+                f"─────────────────\n"
+                f"Position closed"
             )
         else:
             return
